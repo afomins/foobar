@@ -1,18 +1,18 @@
 nolog = 0
 
 def log(s):
-	if nolog:
-		return
-	print(s)
+    if nolog:
+        return
+    print(s)
 
 def get_divisors(value):
-	log(">>> get_divisors(" + str(value) + ")")
-	divisors = []
-	for i in range(1, value):
-		if value % i == 0:
-			divisors.append(i)
-			log(" d=" + str(i))
-	return divisors
+    log(">>> get_divisors(" + str(value) + ")")
+    divisors = []
+    for i in range(1, value):
+        if value % i == 0:
+            divisors.append(i)
+            log(" d=" + str(i))
+    return divisors
 
 def get_max_equal_parts(divisors, input):
     log(">>> get_max_equal_parts(" + input + ")")
@@ -25,13 +25,13 @@ def get_max_equal_parts(divisors, input):
         for xxx in range(0, step_num):
             candidate = input[cursor_pos:cursor_pos+cursor_size]
             if cursor != candidate:
-        	    bingo = False
-        	    break
+                bingo = False
+                break
             cursor_pos += cursor_size
 
         log(" cursor=" + cursor +" bingo=" + str(bingo))
         if bingo:
-        	return step_num
+            return step_num
 
     return 1
 
