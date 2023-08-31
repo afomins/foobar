@@ -11,7 +11,7 @@ def solution(l, t):
         cursor_sum = 0
         for cursor_size in range(0, l_size - cursor_pos):
             cursor_end = cursor_pos + cursor_size
-            cursor_sum += l[cursor_pos + cursor_size]
+            cursor_sum += l[cursor_end]
             if cursor_sum == t:
                 return [cursor_pos, cursor_end]
             elif cursor_sum > t:
