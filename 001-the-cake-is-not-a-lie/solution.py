@@ -23,7 +23,7 @@ def get_max_equal_parts(divisors, input):
         step_num = len(input) / cursor_size
         bingo = True
         for xxx in range(0, step_num):
-            candidate = input[cursor_pos:cursor_pos+cursor_size]
+            candidate = input[cursor_pos:cursor_pos + cursor_size]
             if cursor != candidate:
                 bingo = False
                 break
