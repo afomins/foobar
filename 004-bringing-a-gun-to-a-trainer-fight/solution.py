@@ -1,6 +1,6 @@
 from array import *
-import fractions
-import math
+#import fractions
+#import math
 
 nolog = 0
 
@@ -11,172 +11,238 @@ def log(s):
 
 class Utils:
     squares = None
-    gcd = None
+    # gcd = None
 
     @staticmethod
     def init(squares_max):
-        Utils.squares = array('L', [i * i for i in range(squares_max + 1)])
+        # Lookup table for squares
+        Utils.squares = array('L',
+            [i * i for i in range(squares_max + 1)])
+
+        # Cache for GCD values
         Utils.gcd = dict()
 
     @staticmethod
-    def get_gcd(x, y):
-        x = abs(x)
-        y = abs(y)
+    def get_square(val):
+        try:
+            return Utils.squares[abs(val)]
+#            return val * val
+        except:
+            log("Failed to find square for " + str(val) + " :: max=" + str(len(Utils.squares)))
+            return None
 
-        if x == y:
-            return 0 if x == 0 else x
+#    @staticmethod
+#    def get_gcd(x, y):
+#        x = abs(x)
+#        y = abs(y)
+#
+#        if x == y:
+#            return 0 if x == 0 else x
+#
+#        key = (x, y) if x < y else (y, x)
+#        if key in Utils.gcd:
+#            return Utils.gcd[key]
+#        else:
+#            val = Utils.gcd[key] = fractions.gcd(x, y)
+#            return val
 
-        key = (x, y) if x < y else (y, x)
-        if key in Utils.gcd:
-            return Utils.gcd[key]
+class Vector2i:
+    def __init__(self, x = 0, y = 0):
+        self.x = int(x)
+        self.y = int(y)
+
+    def str(self):
+        return str((self.x, self.y))
+
+class Line:
+    def __init__(self, eol):
+        # End of line
+        self.eol = eol
+
+        #
+        # Line equasion             -> y = a * x + b
+        # For lines crossing (0, 0) -> b = 0
+        #                           -> a = y / x
+        #
+
+        # Perfectly, fucking, vertical line
+        if self.is_vertical():
+            self.a = float('inf')
+
+            # Normalized direction
+#            self.dir = Vector2i(0, +1 if eol.y > 0 else -1)
+
+        # Horizontal line
+        elif self.is_horizontal():
+            self.a = 0.0
+
+            # Normalized direction
+#            self.dir = Vector2i(+1 if eol.x > 0 else -1, 0)
+
+        # Skewed line
         else:
-            val = Utils.gcd[key] = fractions.gcd(x, y)
-            return val
+            self.a = float(eol.y) / float(eol.x)
 
-class Vector:
-    def __init__(self, pos_x, pos_y):
-        self.x = float(pos_x)
-        self.y = float(pos_y)
+            # Normalized direction
+#            gcd = Utils.get_gcd(eol.x, eol.y)
+#            self.dir = Vector2i(eol.x / gcd, eol.y / gcd)
 
-class Ray:
-    def __init__(self, origin, dir):
-        # GDC-normalized direction
-        self.dir = dir
+        # Length of the line squared
+        self.len2 = \
+            Utils.get_square(eol.x) + Utils.get_square(eol.y)
 
-        # Vertical/horizontal
-        if self.is_vertical() or self.is_horizontal():
-            self.b = 0.0
-
-        # Skewed line equasion: y = a * x + b
-        #  a = dir.y / dir.x
-        #  b = origin.y - a * origin.x
-        else:
-            self.b = origin.y - ((origin.x * dir.y) / dir.x)
+        # Quater where eol resides:
+        #      ^
+        #    1 | 0
+        # -----+--->
+        #    2 | 3
+        self.quater = \
+            0 if eol.x >  0 and eol.y >= 0 else \
+            1 if eol.x <= 0 and eol.y > 0 else \
+            2 if eol.x <  0 and eol.y <= 0 else \
+            3 if eol.x >= 0 and eol.y < 0 else \
+            42 # should not happen
 
     def is_vertical(self):
-        return self.dir.x == 0
+        return self.eol.x == 0
 
     def is_horizontal(self):
-        return self.dir.y == 0
+        return self.eol.y == 0
 
     def get_key(self):
-        return (self.dir.x, self.dir.y, self.b)
+        return (self.a, self.quater)
+#        return (self.dir.x, self.dir.y, self.quater)
 
-    def get_str(self):
-        return "(" + str(self.dir.x) + "," + str(self.dir.y) + "," + str(self.b) + ")"
-
-    def get_normalized_dir(self):
-        dx = self.dir.x
-        dy = self.dir.y
-        len = math.sqrt(dx * dx + dy * dy)
-        return Vector(dx / len, dy / len)
+    def str(self):
+        return \
+             "(x=" + str(self.eol.x) + \
+            ", y=" + str(self.eol.y) + \
+            ", l=" + str(self.len2) + \
+            ", q=" + str(self.quater) + \
+            ", a=" + str(self.a) + ")"
 
 class Room:
-    def __init__(self, size, origin, target):
+    def __init__(self, x, y, size, offset):
+        # Index of the room in each direction
+        self.idx = Vector2i(x, y)
+
+        # Size of the room
         self.size = size
-        self.origin = origin
-        self.target = target
 
-    def test_segment(self, x, y, ray):
-        pass
+        # Invert room layout per axis for odd rooms
+        self.invert = Vector2i(x % 2, y % 2)
 
-    def shoot(self, ray, distance):
-        def test_straight_line(origin, len, dir, target):
-            if dir > 0: # right/up
-                return origin + len >= target
-            else: # left/down
-                return origin - len <= target
+        # Coordinates of bottom-left corner of the room
+        self.pos = Vector2i(
+            x * size.x - offset.x,
+            y * size.y - offset.y)
 
-        #
-        # Vertical
-        #
-        if ray.is_vertical():
-            return self.origin.x == self.target.x and \
-                test_straight_line(self.origin.y, distance, ray.dir.y, self.target.y)
+    def get_aligned_pos(self, pos):
+        def align(pos, origin, size, invert):
+            if invert == 0:
+                return origin + pos
+            else:
+                return origin + size - pos
 
-        #
-        # Horizontal
-        #
-        if ray.is_horizontal():
-            return self.origin.y == self.target.y and \
-                test_straight_line(self.origin.x, distance, ray.dir.x, self.target.x)
-
-        #
-        # Skewed
-        #
-        dir_norm = ray.get_normalized_dir()
-        end_of_ray = Vector(self.origin.x + dir_norm.x * distance, \
-                            self.origin.y + dir_norm.y * distance)
-        last_segment_idx = int(end_of_ray.x / self.size.x)
-
-        for segment_x in range(last_segment_idx + 1):
-            cross_x = float(segment_x * self.size.x)
-            if segment_x % 2 == 0: # even
-                cross_x += self.target.x # normal offset
-
-            else: # odd
-                cross_x += self.size.x - self.target.x # mirror offset
-
-            # a = dir.y / dir.x
-            # y = x * a + b
-            cross_y = (cross_x * dir_norm.y) / dir_norm.x + ray.b
-
-        return False
-
+        return Vector2i(
+            align(pos.x, self.pos.x, self.size.x, self.invert.x),
+            align(pos.y, self.pos.y, self.size.y, self.invert.y));
 
 def solution(dimensions, your_position, trainer_position, distance):
-    # Initialize
-    Utils.init(distance + 1)
-
     # Prepare level
-    room_size = Vector(dimensions[0], dimensions[1])
-    origin = Vector(your_position[0], your_position[1])
-    target = Vector(trainer_position[0], trainer_position[1])
-    room = Room(room_size, origin, target)
+    room_size = Vector2i(dimensions[0], dimensions[1])
+    player_pos = Vector2i(your_position[0], your_position[1])
+    enemy_pos = Vector2i(trainer_position[0], trainer_position[1])
 
-    # Cache
-    rays = dict()
-    rays_hits = []
+    # Number of rooms expanded in each direction
+    room_num = Vector2i(distance / room_size.x + 1, \
+                        distance / room_size.y + 1)
 
-    # Iterate all possible vectors
-    for y in range(distance):
-        for x in range(distance):
-            if x == y == 0:
-                continue # ignore self
+    # Init
+    Utils.init(max((room_num.x + 1) * room_size.x, (room_num.y + 1) * room_size.y))
 
-            # Perfectly, fucking, vertical
-            if x == 0: 
-                dir_x = 0
-                dir_y = 1 if y > 0 else -1
+    log("room-size      -> " + room_size.str())
+    log("room-expansion -> " + room_num.str())
+    log("player-pos     -> " + player_pos.str())
+    log("enemy-pos      -> " + enemy_pos.str())
+    log("ray-distance   -> " + str(distance))
+    log("")
 
-            # Horizontal
-            elif y == 0: 
-                dir_x = 1 if x > 0 else -1
-                dir_y = 0
+    # Distance squared
+    distance2 = Utils.get_square(distance)
 
-            # Simplify skewed vector by greatest-common-divisor
+    # Room generator
+    def walk_rooms(num, size, offset):
+        for y in range(-num.y, num.y + 1):
+            for x in range(-num.x, num.x + 1):
+                yield Room(x, y, size, offset);
+
+    #
+    # Cache all lines from player in room (0, 0) to enemies in all extended rooms
+    #
+    lines = dict();
+    for room in walk_rooms(room_num, room_size, player_pos):
+        # Position of the enemy in aligned room
+        aligned_pos = room.get_aligned_pos(enemy_pos)
+
+        # Ignore origin
+        if aligned_pos.x == aligned_pos.y == 0:
+            continue
+
+        # Build new line from player (0, 0) to enemy in extended room
+        line = Line(aligned_pos)
+
+        # Ignore candidates past the max distance
+        if (line.len2 > distance2):
+            continue
+
+        # Save unique line
+        line_key = line.get_key()
+        line_prev = lines[line_key] if line_key in lines else None
+        line_status = ""
+        if line_prev == None:
+            lines[line_key] = line
+            line_status = "NEW"
+
+        # Prefer shorter lines
+        else:
+            if line.len2 < line_prev.len2:
+                lines[line_key] = line
+                line_status = "UPDATE-SHORTER-LENGTH"
             else:
-                gcd = Utils.get_gcd(x, y)
-                dir_x = x / gcd
-                dir_y = y / gcd
+                line_status = "IGNORE"
 
-            # Create and cache new ray
-            ray = Ray(origin, Vector(dir_x, dir_y))
-            ray_key = ray.get_key()
-            if ray_key in rays:
-                d = rays[ray_key]
-                log("v=(" + str(x) + "," + str(y) + ") duplicate by " + d.get_str())
-                continue # ignore duplicate
-            else:
-                rays[ray_key] = ray
+#        log("line=" + line.str() + " room=" + room.idx.str() + " " + line_status)
 
-            # Shoot
-            rc = room.shoot(ray, distance)
-            if rc:
-                rays_hits.append(ray)
+    #
+    # Exclude lines hitting player in extended rooms
+    #
+    for line in lines.values():
+        for room in walk_rooms(room_num, room_size, player_pos):
+            # Ignore origin room
+            if room.idx.x == room.idx.y == 0:
+                continue # try next room
 
-            log("v=(" + str(x) + "," + str(y) + ") -> " + ray.get_str() + " rc=" + str(rc))
+            # Position of the player in aligned room
+            aligned_pos = room.get_aligned_pos(player_pos)
+
+            # Build new line from player (0, 0) to player in extended room
+            # and check if same line towards target is present in cache
+            line = Line(aligned_pos)
+            line_key = line.get_key()
+            line_prev = lines[line_key] if line_key in lines else None
+            if line_prev == None:
+                continue # try next room
+
+            # Remove line towards target if player from another room is standing in the way 
+            line_prev = lines[line_key]
+            if line.len2 < line_prev.len2:
+#                 log("line=" + line_prev.str() + " room=" + room.idx.str() + " DELETE-PLAYER-COLLISION")
+                del lines[line_key]
+                break # bingo - try next line
 
     log("")
-    log("Hits=" + str([(r.dir.x, r.dir.y, r.b) for r in rays_hits]))
-    return len(rays_hits)
+#    log("" + str([l.str() for l in lines.values()]))
+    log("")
+
+    return len(lines)
