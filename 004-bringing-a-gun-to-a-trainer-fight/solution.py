@@ -93,14 +93,14 @@ class Line:
 
         # Quater where eol resides:
         #      ^
-        #    1 | 0
+        #    2 | 1
         # -----+--->
-        #    2 | 3
+        #    3 | 4
         self.quater = \
-            0 if eol.x >  0 and eol.y >= 0 else \
-            1 if eol.x <= 0 and eol.y > 0 else \
-            2 if eol.x <  0 and eol.y <= 0 else \
-            3 if eol.x >= 0 and eol.y < 0 else \
+            1 if eol.x >  0 and eol.y >= 0 else \
+            2 if eol.x <= 0 and eol.y >  0 else \
+            3 if eol.x <  0 and eol.y <= 0 else \
+            4 if eol.x >= 0 and eol.y <  0 else \
             42 # should not happen
 
     def is_vertical(self):
@@ -129,7 +129,7 @@ class Room:
         # Size of the room
         self.size = size
 
-        # Invert room layout per axis for odd rooms
+        # Invert room layout per-axis for odd rooms
         self.invert = Vector2i(x % 2, y % 2)
 
         # Coordinates of bottom-left corner of the room
@@ -159,7 +159,9 @@ def solution(dimensions, your_position, trainer_position, distance):
                         distance / room_size.y + 1)
 
     # Init
-    Utils.init(max((room_num.x + 1) * room_size.x, (room_num.y + 1) * room_size.y))
+    Utils.init(max(
+        (room_num.x + 1) * room_size.x, 
+        (room_num.y + 1) * room_size.y))
 
     log("room-size      -> " + room_size.str())
     log("room-expansion -> " + room_num.str())
@@ -171,18 +173,57 @@ def solution(dimensions, your_position, trainer_position, distance):
     # Distance squared
     distance2 = Utils.get_square(distance)
 
+    # Check if too far
+    origin_room = Room(0, 0, room_size, player_pos)
+    enemy_pos_aligned = origin_room.get_aligned_pos(enemy_pos);
+    stright_line_to_enemy = Line(enemy_pos_aligned)
+    if stright_line_to_enemy.len2 > distance2:
+        log(" line=" + stright_line_to_enemy.str() + \
+            " room=" + origin_room.idx.str() + \
+            " TOO FAR")
+        return 0
+
+    # Check if exact match
+    if stright_line_to_enemy.len2 == distance2:
+        log(" line=" + stright_line_to_enemy.str() + \
+            " room=" + origin_room.idx.str() + \
+            " EXACT MATCH")
+        return 1
+
     # Room generator
-    def walk_rooms(num, size, offset):
-        for y in range(-num.y, num.y + 1):
-            for x in range(-num.x, num.x + 1):
+    def walk_rooms(num, size, offset, quater = 0):
+        q_desc = [
+            #      ^
+            #    2 | 1
+            # -----+--->
+            #    3 | 4
+
+            # -y +y  -x +x
+            (-1, +1, -1, +1), # all
+            ( 0, +1,  0, +1), # 1
+            ( 0, +1, -1,  0), # 2
+            (-1,  0, -1,  0), # 3
+            (-1,  0,  0, +1), # 4
+        ]
+
+#        for y in range(-num.y, num.y + 1):
+#            for x in range(-num.x, num.x + 1):
+        q = q_desc[quater]
+        for y in range(q[0] * num.y, q[1] * num.y + 1):
+            for x in range(q[2] * num.x, q[3] * num.x + 1):
                 yield Room(x, y, size, offset);
+
+#    for r in walk_rooms(Vector2i(4, 3), Vector2i(10, 10), Vector2i(-10, -10), 4):
+#        log(r.idx.str())
+#    return 7
 
     #
     # Cache all lines from player in room (0, 0) to enemies in all extended rooms
     #
+    log("Targeting enemies:")
     lines = dict();
     for room in walk_rooms(room_num, room_size, player_pos):
-        # Position of the enemy in aligned room
+        # Position of the enemy in extended room
         aligned_pos = room.get_aligned_pos(enemy_pos)
 
         # Ignore origin
@@ -192,57 +233,60 @@ def solution(dimensions, your_position, trainer_position, distance):
         # Build new line from player (0, 0) to enemy in extended room
         line = Line(aligned_pos)
 
-        # Ignore candidates past the max distance
+        # Ignore candidates past max distance
         if (line.len2 > distance2):
             continue
 
-        # Save unique line
+        # Cache unique line
         line_key = line.get_key()
-        line_prev = lines[line_key] if line_key in lines else None
+        line_cached = lines[line_key] if line_key in lines else None
         line_status = ""
-        if line_prev == None:
+        if line_cached == None:
             lines[line_key] = line
             line_status = "NEW"
 
         # Prefer shorter lines
         else:
-            if line.len2 < line_prev.len2:
+            if line.len2 < line_cached.len2:
                 lines[line_key] = line
                 line_status = "UPDATE-SHORTER-LENGTH"
             else:
                 line_status = "IGNORE"
 
-#        log("line=" + line.str() + " room=" + room.idx.str() + " " + line_status)
+        log(" line=" + line.str() + " room=" + room.idx.str() + " " + line_status)
 
     #
-    # Exclude lines hitting player in extended rooms
+    # Exclude lines from cache that cross players position in extended rooms
     #
-    for line in lines.values():
-        for room in walk_rooms(room_num, room_size, player_pos):
-            # Ignore origin room
+    log("")
+    log("Excluding player collision:")
+    line_num = 0
+    # for line_to_enemy in lines.values():
+    for k, line_to_enemy in lines.iteritems():
+        line_num += 1
+        for room in walk_rooms(room_num, room_size, player_pos, line_to_enemy.quater):
+            # Ignore origin room (0, 0)
             if room.idx.x == room.idx.y == 0:
                 continue # try next room
 
-            # Position of the player in aligned room
-            aligned_pos = room.get_aligned_pos(player_pos)
-
-            # Build new line from player (0, 0) to player in extended room
-            # and check if same line towards target is present in cache
-            line = Line(aligned_pos)
-            line_key = line.get_key()
-            line_prev = lines[line_key] if line_key in lines else None
-            if line_prev == None:
+            # Build line from player in room (0, 0) to player in extended room
+            # and check if it matches to cached line to enemy
+            line_to_player = Line(room.get_aligned_pos(player_pos))
+            if line_to_player.get_key() != line_to_enemy.get_key():
                 continue # try next room
 
-            # Remove line towards target if player from another room is standing in the way 
-            line_prev = lines[line_key]
-            if line.len2 < line_prev.len2:
-#                 log("line=" + line_prev.str() + " room=" + room.idx.str() + " DELETE-PLAYER-COLLISION")
-                del lines[line_key]
+            # Remove line to  enemy if player from another room is standing in the way
+            if line_to_player.len2 < line_to_enemy.len2:
+                log(" line=" + line_to_enemy.str() + \
+                    " room=" + room.idx.str() + \
+                    " DELETE-PLAYER-COLLISION")
+#                del lines[line_key]
+                line_num -= 1
                 break # bingo - try next line
 
     log("")
+    log("Done")
 #    log("" + str([l.str() for l in lines.values()]))
     log("")
 
-    return len(lines)
+    return line_num #len(lines)
