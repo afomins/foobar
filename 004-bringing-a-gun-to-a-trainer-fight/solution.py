@@ -113,6 +113,11 @@ class Line:
         return (self.a, self.quater)
 #        return (self.dir.x, self.dir.y, self.quater)
 
+    def walk_rooms(self, room_size):
+        step = None
+        if self.is_vertical:
+            step.x = room_size
+
     def str(self):
         return \
              "(x=" + str(self.eol.x) + \
@@ -255,6 +260,22 @@ def solution(dimensions, your_position, trainer_position, distance):
 
         log(" line=" + line.str() + " room=" + room.idx.str() + " " + line_status)
 
+    # Room generator2
+    def walk_rooms2(line, size, offset):
+        if line.is_vertical():
+            dir = 1 if line.eol.y > 0 else -1
+            last_room_y = line.eol.y / size.y + dir
+            for room_y in range(0, last_room_y, dir):
+                yield Room(0, room_y, size, offset)
+
+        else:
+            dir = 1 if line.eol.x > 0 else -1
+            last_room_x = line.eol.x / size.x + dir
+            for room_x in range(0, last_room_x, dir):
+                pos_x = Room(room_x, 0, size, offset).get_aligned_pos(offset).x
+                pos_y = int(line.a * float(pos_x))
+                yield Room(room_x, pos_y / size.y, size, offset)
+
     #
     # Exclude lines from cache that cross players position in extended rooms
     #
@@ -264,7 +285,11 @@ def solution(dimensions, your_position, trainer_position, distance):
     # for line_to_enemy in lines.values():
     for k, line_to_enemy in lines.iteritems():
         line_num += 1
-        for room in walk_rooms(room_num, room_size, player_pos, line_to_enemy.quater):
+        room_limit = Vector2i()
+        room_limit.x = abs(line_to_enemy.eol.x) / room_size.x
+        room_limit.y = abs(line_to_enemy.eol.y) / room_size.y
+        for room in walk_rooms(room_limit, room_size, player_pos, line_to_enemy.quater):
+        # for room in walk_rooms2(line_to_enemy, room_size, player_pos):
             # Ignore origin room (0, 0)
             if room.idx.x == room.idx.y == 0:
                 continue # try next room
